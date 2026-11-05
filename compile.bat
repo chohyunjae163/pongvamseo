@@ -1,0 +1,1 @@
+emcc -o game.html game.c -Os -Wall C:\raylib-master\src\libraylib.a -I. -IC:\raylib-master\src\ -L. -LC:\raylib-master\src\ -s USE_GLFW=3 --shell-file C:\raylib-master\src\minshell.html -DPLATFORM_WEB
