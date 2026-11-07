@@ -19,8 +19,6 @@
 
 #include "raylib.h"
 
-#define PLATFORM_WEB
-
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
@@ -48,10 +46,6 @@ struct Entity {
 	int ID;
 };
 
-//#define NUM_ENTITY 3
-
-
-
 enum Entity_ID {
 	ID_None			= -1,
 	ID_Ball 		= 0,
@@ -60,9 +54,13 @@ enum Entity_ID {
 	NUM_Entity = 3,
 };
 
-Vector2 velocity[NUM_Entity];
-Vector2 positions[NUM_Entity];
+bool	current_entities_alive[NUM_Entity];
 
+Vector2 current_velocity[NUM_Entity];
+Vector2 current_positions[NUM_Entity];
+
+
+void HandlePlayerInput();
 Vector2 HandleAccelInput(enum Entity_ID Entity, float FrameTime);
 Vector2 ConsumeAccelInput(enum Entity_ID Entity,Vector2 Acceleration);
 Vector2 UpdatePosition(enum Entity_ID Entity,Vector2 Velocity);
@@ -76,12 +74,14 @@ int main(void)
 	//--------------------------------------------------------------------------------------
 	InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
 
-	positions[ID_Ball].x = screenWidth / 2.0f;
-	positions[ID_Ball].y = screenHeight / 2.0f;
-	positions[ID_Paddle_1].x = 100.0f;
-	positions[ID_Paddle_1].y = screenHeight / 2.0f;
-	positions[ID_Paddle_2].x = screenWidth - 100.0f;
-	positions[ID_Paddle_2].y = screenHeight / 2.0f;
+	current_entities_alive[ID_Paddle_1] = true;
+
+	current_positions[ID_Ball].x = screenWidth / 2.0f;
+	current_positions[ID_Ball].y = screenHeight / 2.0f;
+	current_positions[ID_Paddle_1].x = 100.0f;
+	current_positions[ID_Paddle_1].y = screenHeight / 2.0f;
+	current_positions[ID_Paddle_2].x = screenWidth - 100.0f;
+	current_positions[ID_Paddle_2].y = screenHeight / 2.0f;
 
 
 	#if defined(PLATFORM_WEB)
@@ -113,7 +113,7 @@ void UpdateDrawFrame(void)
 {
 	// Update
 	float FrameTime = GetFrameTime();
-	//TraceLog(LOG_INFO, "frame time : %.4f", FrameTime);
+	TraceLog(LOG_INFO, "frame time : %.4f", FrameTime);
 
 	//----------------------------------------------------------------------------------
 	// TODO: Update your variables here
@@ -121,12 +121,19 @@ void UpdateDrawFrame(void)
 
 	for (int i = 0; i < NUM_Entity; ++i) {
 		enum Entity_ID entity = i;
+
+		if (current_entities_alive[entity] == false) continue;
+
+
 		Vector2 acceleration = HandleAccelInput(entity,FrameTime);
-		velocity[entity] = ConsumeAccelInput(entity,acceleration);
-		Vector2 position = UpdatePosition(velocity[entity],velocity);
-		positions[entity].x += position.x;
-		positions[entity].y += position.y;
-		TraceLog(LOG_INFO, "%d's position y : %.4f",entity ,positions[entity].y);
+		Vector2 add_velocity = ConsumeAccelInput(entity,acceleration);
+		current_velocity[entity].x += add_velocity.x;
+		current_velocity[entity].y += add_velocity.y;
+
+		Vector2 add_position = UpdatePosition(entity,current_velocity[entity]);
+		current_positions[entity].x += add_position.x;
+		current_positions[entity].y += add_position.y;
+		TraceLog(LOG_INFO, "current_positions y : %.4f", current_positions[entity].y);
 	}	
 
 	// Draw
@@ -141,10 +148,17 @@ void UpdateDrawFrame(void)
 	//----------------------------------------------------------------------------------
 }
 
+bool bMoveUp = false;
+bool bMoveDown = false;
+void HandlePlayerInput() {
+	bMoveUp = IsKeyDown(KEY_UP);
+	bMoveDown = IsKeyDown(KEY_DOWN);
+}
+
+float accumulate = 0.0f;
 
 Vector2 HandleAccelInput(enum Entity_ID Entity,float FrameTime) {
 	Vector2 acceleration = { 0 };
-	float accumulate = 0.f;
 
 	switch (Entity) {
 		case ID_None: // you dumbass. 
@@ -156,10 +170,11 @@ Vector2 HandleAccelInput(enum Entity_ID Entity,float FrameTime) {
 			
 		case ID_Paddle_1: { 	//acceleration comes from input
 			//handle input!
-			while (accumulate < FrameTime) {
-				accumulate += INPUT_HANDLE_INTERVAL;
-				if (IsKeyDown(KEY_UP)) acceleration.y += 0.01f;
-				else if (IsKeyDown(KEY_DOWN)) acceleration.y -= 0.01f;
+			accumulate += FrameTime;
+			while (accumulate > INPUT_HANDLE_INTERVAL) {
+				accumulate -= INPUT_HANDLE_INTERVAL;
+				if (bMoveUp) acceleration.y += 1.0f;
+				else if (bMoveDown) acceleration.y -= 1.0f;
 			}
 		} break;
 
@@ -192,7 +207,6 @@ Vector2 ConsumeAccelInput(enum Entity_ID Entity,Vector2 Acceleration) {
 		default:
 			break;
 	}
-	
 
 	return velocity;
 }
